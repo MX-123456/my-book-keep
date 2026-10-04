@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>存钱取钱记账助手</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230F9D6C'/%3E%3Ctext x='16' y='22' font-size='16' font-weight='700' text-anchor='middle' fill='white' font-family='sans-serif'%3E¥%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#F4F6F3;
+  --card:#FFFFFF;
+  --ink:#1B2A24;
+  --sub:#7A8A84;
+  --muted:#9AA8A2;
+  --line:#E3E9E5;
+  --save:#0F9D6C;
+  --save-deep:#0B6B4F;
+  --save-soft:#EAF7F1;
+  --draw:#E0562B;
+  --draw-soft:#FDF1EC;
+  --radius:14px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei","Segoe UI",sans-serif;
+  font-size:15px;line-height:1.55;
+  padding-bottom:calc(72px + env(safe-area-inset-bottom));
+  -webkit-font-smoothing:antialiased;
+}
+.muted{color:var(--muted);font-size:12px}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;padding:0}
+input,select{font-family:inherit;color:inherit}
+/* ===== 顶部栏 ===== */
+.topbar{position:sticky;top:0;z-index:20;background:rgba(244,246,243,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar-inner{max-width:720px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:10px}
+.brand{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700}
+.brand-icon{width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg,var(--save) 0%,var(--save-deep) 100%);display:flex;align-items:center;justify-content:center;color:#fff;flex:none}
+.brand-icon svg{width:16px;height:16px}
+.brand-sub{margin-left:auto;font-size:11px;color:var(--muted)}
+/* ===== 主容器 ===== */
+.app{max-width:720px;margin:0 auto;padding:14px 14px 8px}
+.view{display:none}
+.view.active{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.card-head h3{margin:0;font-size:15px;font-weight:700}
+/* ===== 结余 Hero ===== */
+.hero{
+  background:linear-gradient(135deg,#0F9D6C 0%,#0B6B4F 100%);
+  border-radius:18px;padding:20px 20px 18px;color:#fff;margin-bottom:14px;
+  box-shadow:0 6px 18px rgba(11,107,79,.22);
+}
+.hero-label{font-size:12px;opacity:.85}
+.hero-num{font-size:42px;font-weight:800;letter-spacing:.5px;margin:4px 0 12px;font-variant-numeric:tabular-nums;line-height:1.1}
+.hero-stats{display:flex;gap:26px;border-top:1px solid rgba(255,255,255,.22);padding-top:12px}
+.hero-stats div{display:flex;flex-direction:column;gap:1px}
+.hero-stats span{font-size:11px;opacity:.8}
+.hero-stats b{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+/* ===== 本月双卡 ===== */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+.stat-label{font-size:13px;color:var(--sub);display:flex;align-items:center;gap:6px}
+.stat-label .ym{font-size:11px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.dot-save{background:var(--save)}
+.dot-draw{background:var(--draw)}
+.stat-num{font-size:24px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.1}
+.stat-num.save{color:var(--save)}
+.stat-num.draw{color:var(--draw)}
+/* ===== 表格 ===== */
+.tbl{width:100%;table-layout:fixed;border-collapse:collapse}
+.tbl th{font-size:12px;color:var(--muted);font-weight:600;text-align:right;padding:6px 6px;border-bottom:1px solid var(--line)}
+.tbl th:first-child,.tbl td:first-child{text-align:left;padding-left:2px}
+.tbl th:nth-child(1){width:30%}.tbl th:nth-child(2){width:24%}.tbl th:nth-child(3){width:24%}.tbl th:nth-child(4){width:22%}
+.tbl td{font-size:14px;padding:7px 6px;text-align:right;font-variant-numeric:tabular-nums;border-bottom:1px solid #F0F3F0}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .positive{color:var(--save);font-weight:600}
+.tbl .negative{color:var(--draw);font-weight:600}
+.tbl .total-row td{border-top:1px solid var(--line);border-bottom:none;font-weight:700}
+/* ===== 图表 ===== */
+.chart-box{position:relative;margin:0 -4px 10px}
+#monthChart{width:100%;height:210px}
+#chartFallback{display:none;height:150px;align-items:center;justify-content:center;border:1px dashed var(--line);border-radius:10px;margin-bottom:10px;flex-direction:column;gap:0}
+.cssbars{display:flex;gap:4px;align-items:flex-end;height:116px;padding:10px 4px 0;width:100%}
+.csscol{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0}
+.cssbars-in{display:flex;align-items:flex-end;gap:2px;height:86px}
+.cssbars-in .bar{width:9px;border-radius:2px 2px 0 0;min-height:2px}
+.bar.save{background:var(--save)}
+.bar.draw{background:var(--draw)}
+.csslab{font-size:10px;color:var(--muted)}
+.csslegend{display:flex;align-items:center;gap:14px;justify-content:flex-end;width:100%;font-size:11px;color:var(--sub);padding:4px 8px 6px}
+.lg{width:10px;height:6px;border-radius:2px;display:inline-block}
+.lg-save{background:var(--save)}
+.lg-draw{background:var(--draw)}
+.css-note{font-size:11px;color:var(--muted);padding:2px 8px 0;width:100%;text-align:right}
+/* ===== AI 小结 ===== */
+.ai-text{margin:0;font-size:14px;color:#33503F;background:var(--save-soft);border:1px solid #D7ECDF;border-radius:10px;padding:12px 14px;line-height:1.6}
+/* ===== 明细筛选 ===== */
+.filter-bar{display:flex;align-items:center;gap:10px;padding:12px 14px}
+.chips{display:flex;gap:8px;flex:1;overflow-x:auto}
+.chip{font-size:14px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);color:var(--sub);white-space:nowrap;transition:all .15s}
+.chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.filter-bar select{font-size:16px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff;color:var(--sub);flex:none}
+/* ===== 记录列表 ===== */
+.rec-list{display:flex;flex-direction:column;gap:10px}
+.rec{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;display:flex;gap:12px;align-items:flex-start}
+.rec-badge{flex:none;width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.rec-badge.save{background:var(--save-soft);color:var(--save)}
+.rec-badge.draw{background:var(--draw-soft);color:var(--draw)}
+.rec-main{flex:1;min-width:0}
+.rec-top{display:flex;align-items:baseline;gap:8px}
+.rec-date{font-size:12px;color:var(--muted)}
+.rec-ai{font-size:12.5px;color:var(--sub);margin-top:2px;line-height:1.45}
+.rec-remark{font-size:12px;color:var(--muted);margin-top:1px}
+.rec-right{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.rec-amt{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+.rec-amt.save{color:var(--save)}
+.rec-amt.draw{color:var(--draw)}
+.rec-del{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+.rec-del.armed{color:#fff;background:var(--draw);border-color:var(--draw);font-weight:600}
+.empty{text-align:center;color:var(--muted);padding:40px 0;font-size:13px}
+/* ===== 记账 ===== */
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#EEF2EE;border-radius:12px;padding:5px;margin-bottom:16px}
+.seg-btn{font-size:15px;font-weight:600;padding:10px 0;border-radius:9px;color:var(--sub)}
+.seg-btn.active{background:#fff;color:var(--ink);box-shadow:0 1px 4px rgba(27,42,36,.12)}
+.seg-btn.active.t-save{color:var(--save)}
+.seg-btn.active.t-draw{color:var(--draw)}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.field>span{font-size:12.5px;color:var(--sub);font-weight:600}
+.field input{border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:16px;background:#FAFBFA;width:100%;outline:none}
+.field input:focus{border-color:var(--save);background:#fff}
+.amount-wrap{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:#FAFBFA;padding:0 12px}
+.amount-wrap:focus-within{border-color:var(--save);background:#fff}
+.amount-wrap .yuan{font-size:18px;font-weight:700;color:var(--sub);margin-right:6px}
+.amount-wrap input{border:none;background:none;padding:12px 0;font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
+.preview{font-size:13px;color:var(--sub);background:#F6F8F5;border-radius:10px;padding:10px 12px;margin-bottom:14px}
+.preview b{color:var(--ink)}
+.btn{display:block;width:100%;text-align:center;font-size:15px;font-weight:700;padding:13px 0;border-radius:12px;transition:opacity .15s}
+.btn:active{opacity:.82}
+.btn.primary{background:linear-gradient(135deg,var(--save),var(--save-deep));color:#fff}
+.btn.primary.draw-mode{background:linear-gradient(135deg,var(--draw),#B8431E)}
+.btn.plain{background:#EEF2EE;color:var(--ink)}
+.btn.ghost{background:#fff;color:var(--sub);border:1px solid var(--line)}
+/* ===== 同步页 ===== */
+.steps{margin:0;padding:0;list-style:none;counter-reset:step}
+.steps li{position:relative;padding:0 0 14px 38px}
+.steps li::before{counter-increment:step;content:counter(step);position:absolute;left:0;top:0;width:24px;height:24px;border-radius:50%;background:var(--save-soft);color:var(--save);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.steps li:not(:last-child)::after{content:"";position:absolute;left:11px;top:26px;bottom:2px;width:1px;background:var(--line)}
+.steps b{font-size:14px}
+.steps p{margin:2px 0 0;font-size:12.5px;color:var(--sub)}
+.sync-btns{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.sync-meta{display:flex;flex-wrap:wrap;gap:6px 20px;margin-top:14px;font-size:13px;color:var(--sub)}
+.sync-meta b{color:var(--ink)}
+.note{margin:12px 0 0;line-height:1.6}
+/* ===== 底部导航 ===== */
+.tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:720px;background:rgba(255,255,255,.96);backdrop-filter:blur(8px);border-top:1px solid var(--line);display:flex;z-index:30;padding-bottom:env(safe-area-inset-bottom)}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 8px;color:var(--muted);font-size:11px}
+.tab svg{width:22px;height:22px}
+.tab.active{color:var(--save);font-weight:600}
+/* ===== Toast ===== */
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(8px);background:rgba(27,42,36,.94);color:#fff;font-size:13px;padding:9px 18px;border-radius:999px;opacity:0;pointer-events:none;transition:all .25s;z-index:50;white-space:nowrap;max-width:86vw;overflow:hidden;text-overflow:ellipsis}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media (min-width:640px){
+  .app{padding:20px 20px 12px}
+  .hero-num{font-size:48px}
+}
+</style>
+<script>
+(function(){
+  function tryLoad(srcs, done){
+    var i = 0;
+    function next(){
+      if(i >= srcs.length){ done && done(); return; }
+      var s = document.createElement('script');
+      s.src = srcs[i++];
+      s.onload = function(){ done && done(); };
+      s.onerror = function(){ s.remove(); next(); };
+      document.head.appendChild(s);
+    }
+    next();
+  }
+  tryLoad([
+    'https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.1/echarts.min.js'
+  ], function(){
+    if(window.echarts && window.drawChart) window.drawChart();
+  });
+  tryLoad([
+    'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+  ], function(){});
+})();
+</script>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.8L18.6 9l-4.8 1.8L12 15.6l-1.8-4.8L5.4 9l4.8-1.2z" /><path d="M18.5 15.5l.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9z" /></svg>
+      </span>
+      <span>存钱取钱记账</span>
+    </div>
+    <span class="brand-sub">手机版 · 可与 Excel 同步</span>
+  </div>
+</header>
+<main class="app">
+  <section class="view active" id="view-overview">
+    <div class="hero">
+      <div class="hero-label">当前结余（元）</div>
+      <div class="hero-num" id="balanceNum">--</div>
+      <div class="hero-stats">
+        <div><span>累计存钱</span><b id="saveAllNum">--</b></div>
+        <div><span>累计取钱</span><b id="drawAllNum">--</b></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="stat">
+        <div class="stat-label"><i class="dot dot-save"></i>本月存钱<span class="ym" id="mLabel1"></span></div>
+        <div class="stat-num save" id="mSaveNum">--</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label"><i class="dot dot-draw"></i>本月取钱<span class="ym" id="mLabel2"></span></div>
+        <div class="stat-num draw" id="mDrawNum">--</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <h3>每月收支明细</h3>
+        <label class="muted" style="display:flex;align-items:center;gap:6px">年份
+          <select id="yearSelect" style="font-size:16px;border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:#fff;color:var(--ink)"></select>
+        </label>
+      </div>
+      <div class="chart-box">
+        <div id="monthChart"></div>
+        <div id="chartFallback">图表组件未加载，请联网后查看，下方表格数据不受影响</div>
+      </div>
+      <table class="tbl">
+        <colgroup><col style="width:30%"><col style="width:24%"><col style="width:24%"><col style="width:22%"></colgroup>
+        <thead><tr><th>月份</th><th>存钱</th><th>取钱</th><th>结余</th></tr></thead>
+        <tbody id="monthTbody"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>AI 收支小结</h3></div>
+      <p class="ai-text" id="aiSummaryText">--</p>
+    </div>
+  </section>
+  <section class="view" id="view-records">
+    <div class="card filter-bar">
+      <div class="chips" id="typeChips">
+        <button class="chip active" data-t="all">全部</button>
+        <button class="chip" data-t="存钱">存钱</button>
+        <button class="chip" data-t="取钱">取钱</button>
+      </div>
+      <select id="monthFilter"><option value="all">全部月份</option></select>
+    </div>
+    <div class="rec-list" id="recordList"></div>
+    <div class="empty" id="recordsEmpty" hidden>暂无记录，去「记账」页添加一笔吧</div>
+  </section>
+  <section class="view" id="view-add">
+    <div class="card add-card">
+      <div class="seg" id="typeSeg">
+        <button class="seg-btn active t-save" data-t="存钱">存钱</button>
+        <button class="seg-btn t-draw" data-t="取钱">取钱</button>
+      </div>
+      <label class="field">
+        <span>日期</span>
+        <input type="date" id="dateInput">
+      </label>
+      <label class="field">
+        <span>金额（元）</span>
+        <div class="amount-wrap"><span class="yuan">¥</span><input type="number" id="amountInput" inputmode="decimal" step="0.01" min="0" placeholder="0.00"></div>
+      </label>
+      <label class="field">
+        <span>备注（可选）</span>
+        <input type="text" id="remarkInput" maxlength="50" placeholder="例如：工资、买菜…">
+      </label>
+      <div class="preview" id="addPreview">记账后结余：--</div>
+      <button class="btn primary" id="submitBtn">记一笔</button>
+    </div>
+  </section>
+  <section class="view" id="view-sync">
+    <div class="card">
+      <div class="card-head"><h3>与 Excel 表格同步</h3></div>
+      <ol class="steps">
+        <li><b>导入同步</b><p>选择本机的「存钱取钱自动记账表.xlsx」，页面立即载入表格最新明细与年份。</p></li>
+        <li><b>手机记账</b><p>在手机上新增、删除记录，数据自动保存在当前浏览器，随时查看汇总。</p></li>
+        <li><b>导出回写</b><p>下载新的 .xlsx 文件（含自动汇总公式），用 Excel / WPS 打开后覆盖原表即可完成回写。</p></li>
+      </ol>
+      <div class="sync-btns">
+        <button class="btn primary" id="importBtn">导入 Excel 表格</button>
+        <button class="btn plain" id="exportBtn">导出 Excel 表格</button>
+        <button class="btn ghost" id="resetBtn">恢复初始数据</button>
+      </div>
+      <div class="sync-meta">
+        <div>记录条数：<b id="syncCount">--</b></div>
+        <div>统计年份：<b id="syncYear">--</b></div>
+        <div>最后导出时间：<b id="syncLast">--</b></div>
+      </div>
+      <p class="note muted">数据保存在当前浏览器的本地存储中；清除浏览器数据或更换设备会丢失，请定期导出 Excel 备份。金额单位均为元。</p>
+    </div>
+  </section>
+</main>
+<nav class="tabbar" id="tabbar">
+  <button class="tab active" data-view="overview">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="15" rx="2.5" /><path d="M3 9.5h18M8 14.5h4" /></svg>
+    <span>概览</span>
+  </button>
+  <button class="tab" data-view="records">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 6h11M8.5 12h11M8.5 18h11" /><circle cx="4.8" cy="6" r="1" fill="currentColor" stroke="none" /><circle cx="4.8" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="4.8" cy="18" r="1" fill="currentColor" stroke="none" /></svg>
+    <span>明细</span>
+  </button>
+  <button class="tab" data-view="add">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" /></svg>
+    <span>记账</span>
+  </button>
+  <button class="tab" data-view="sync">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7" /><path d="M20 4v4h-4" /></svg>
+    <span>同步</span>
+  </button>
+</nav>
+<div class="toast" id="toast"></div>
+<input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+<script>
+const STORAGE_KEY = 'ledger_records_v1';
+const YEAR_KEY    = 'ledger_year_v1';
+const SYNC_KEY    = 'ledger_last_sync_v1';
+const EMBEDDED = [
+ {date:'2026-09-02',type:'存钱',amount:52,    remark:'',ai:'坚持攒下52元，离目标又近一步啦'},
+ {date:'2026-09-06',type:'取钱',amount:52,    remark:'',ai:'理性消费，这笔52元的支出要多思量。'},
+ {date:'2026-09-15',type:'存钱',amount:50,    remark:'',ai:'今天存了50元，继续坚持攒钱呀'},
+ {date:'2026-09-20',type:'取钱',amount:100,   remark:'',ai:'理性消费，取100元花在刀刃上哦'},
+ {date:'2026-10-02',type:'取钱',amount:666,   remark:'',ai:'取了666元，理性消费别乱花哦'},
+ {date:'2026-09-02',type:'存钱',amount:566.8, remark:'',ai:'坚持攒下566.80元，离目标更近一步。'},
+ {date:'2026-09-06',type:'取钱',amount:694.4, remark:'',ai:'理性消费，这笔694.4元花得值当。'},
+ {date:'2026-09-15',type:'存钱',amount:822,   remark:'',ai:'坚持攒下822元，离目标又近一步啦'},
+ {date:'2026-09-20',type:'取钱',amount:949.6, remark:'',ai:'理性消费，这笔949.60元的支出要按需使用哦'},
+ {date:'2026-10-02',type:'取钱',amount:1077.2,remark:'',ai:'理性消费，这1077.20元花得值当。'},
+ {date:'2026-09-02',type:'存钱',amount:1204.8,remark:'',ai:'继续坚持攒钱，离目标又近一步啦'},
+ {date:'2026-09-06',type:'取钱',amount:1332.4,remark:'',ai:'理性消费，这笔1332.4元的支出要记得节制哦'},
+ {date:'2026-09-15',type:'存钱',amount:1460,  remark:'',ai:'坚持攒下1460元，离目标更近一步啦'},
+ {date:'2026-09-20',type:'取钱',amount:1587.6,remark:'',ai:'理性消费，这笔1587.6元的支出要多留意哦'},
+ {date:'2026-09-02',type:'存钱',amount:1715.2,remark:'',ai:'坚持攒下1715.20元，离目标更近一步。'},
+ {date:'2026-09-06',type:'取钱',amount:1842.8,remark:'',ai:'理性消费，这笔1842.8元的支出要花得值哦'},
+ {date:'2026-09-15',type:'存钱',amount:1970.4,remark:'',ai:'坚持攒下1970.4元，离目标更近一步啦'},
+ {date:'2026-09-20',type:'取钱',amount:2098,  remark:'',ai:'取了2098元，理性消费别乱花哦'},
+ {date:'2026-10-02',type:'取钱',amount:2225.6,remark:'',ai:'理性消费，这笔2225.6元取钱要按需支出'},
+ {date:'2026-09-02',type:'存钱',amount:2353.2,remark:'',ai:'坚持攒下2353.20元，离目标更近啦'},
+ {date:'2026-09-06',type:'取钱',amount:2480.8,remark:'',ai:'理性消费，这笔2480.8元的支出要多留意哦'},
+ {date:'',          type:'存钱',amount:20,    remark:'',ai:'坚持攒下20元，离目标又近一步啦。'},
+ {date:'',          type:'存钱',amount:0,     remark:'',ai:'坚持攒钱，未来一定会有更多惊喜哦。'}
+];
+let records = [];
+let year = 2026;
+let view = 'overview';
+let typeFilter = 'all';
+let monthFilter = 'all';
+let addType = '存钱';
+let armedDel = -1, armedTimer = null;
+let chart = null;
+const $ = id => document.getElementById(id);
+
+// 读取本地存储
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr) && arr.length>0){
+        records = arr;
+      }
+    }
+  }catch(e){}
+  if(!records || records.length===0){
+    records = EMBEDDED.map(r => Object.assign({}, r));
+  }
+  try{
+    const y = parseInt(localStorage.getItem(YEAR_KEY),10);
+    if(y>=2000 && y<=2100) year = y;
+  }catch(e){}
+}
+// 保存全部数据到浏览器本地
+function saveState(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    localStorage.setItem(YEAR_KEY, String(year));
+  }catch(e){
+    console.warn("存储失败",e);
+  }
+}
+
+const money = n => (Math.round(n*100)/100).toLocaleString('zh-CN',{minimumFractionDigits:2, maximumFractionDigits:2});
+const num = n => { const r = Math.round(n*100)/100; return Number.isInteger(r) ? String(r) : String(r); };
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+let toastTimer = null;
+function toast(msg){
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove('show'),2200);
+}
+
+function calcStats(){
+  const now = new Date();
+  const cy = now.getFullYear(), cm = now.getMonth()+1;
+  let saveAll=0,drawAll=0,mSave=0,mDraw=0;
+  const monthly = Array.from({length:12},()=>({save:0,draw:0}));
+  for(const r of records){
+    const amt = typeof r.amount==='number'?r.amount:(parseFloat(r.amount)||0);
+    if(r.type==='存钱') saveAll+=amt;
+    else if(r.type==='取钱') drawAll+=amt;
+    if(r.date){
+      const p = r.date.split('-');
+      const y = +p[0], m=+p[1];
+      if(y===cy && m===cm){
+        if(r.type==='存钱') mSave+=amt; else mDraw+=amt;
+      }
+      if(y===year && m>=1 && m<=12){
+        if(r.type==='存钱') monthly[m-1].save+=amt;
+        else monthly[m-1].draw+=amt;
+      }
+    }
+  }
+  return {saveAll,drawAll,balance:saveAll-drawAll,mSave,mDraw,mBalance:mSave-mDraw,monthly,cy,cm};
+}
+
+const SAVE_TEXTS = [
+  a => '坚持攒下' + num(a) + '元，离目标又近一步啦',
+  a => '今天存了' + num(a) + '元，继续坚持攒钱呀',
+  a => '坚持攒下' + num(a) + '元，离目标更近一步啦',
+  a => '继续坚持攒钱，今天存了' + num(a) + '元'
+];
+const DRAW_TEXTS = [
+  a => '理性消费，这笔' + num(a) + '元的支出要多思量。',
+  a => '理性消费，这笔' + num(a) + '元花得值当。',
+  a => '理性消费，这笔' + num(a) + '元的支出要按需使用哦',
+  a => '取了' + num(a) + '元，理性消费别乱花哦'
+];
+function genAI(type,amount,idx){
+  const list = type==='存钱'?SAVE_TEXTS:DRAW_TEXTS;
+  return list[idx%list.length](amount);
+}
+function aiSummary(s){
+  const bal = s.balance;
+  if(bal<0) return '当前结余为负（'+money(bal)+' 元），注意控制支出，理性消费才能慢慢攒下钱。';
+  if(bal===0) return '当前收支刚好平衡，继续保持攒钱节奏，理性消费。';
+  return '当前结余为 '+money(bal)+' 元，继续保持攒钱节奏，理性消费，离目标越来越近啦。';
+}
+
+function render(){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  $('view-'+view).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===view));
+  if(view==='overview') renderOverview();
+  else if(view==='records') renderRecords();
+  else if(view==='sync') renderSync();
+}
+
+function renderOverview(){
+  const s = calcStats();
+  $('balanceNum').textContent = money(s.balance);
+  $('saveAllNum').textContent = money(s.saveAll);
+  $('drawAllNum').textContent = money(s.drawAll);
+  $('mLabel1').textContent = '('+s.cy+'年'+s.cm+'月)';
+  $('mLabel2').textContent = '('+s.cy+'年'+s.cm+'月)';
+  $('mSaveNum').textContent = money(s.mSave);
+  $('mDrawNum').textContent = money(s.mDraw);
+  $('aiSummaryText').textContent = aiSummary(s);
+
+  const sel = $('yearSelect');
+  const years = [];
+  for(let y=2015;y<=2035;y++) years.push(y);
+  sel.innerHTML = years.map(y=>'<option value="'+y+'"'+(y===year?' selected':'')+'>'+y+'年</option>').join('');
+
+  const tbody = $('monthTbody');
+  let html='';
+  for(let m=1;m<=12;m++){
+    const d = s.monthly[m-1], bal = d.save-d.draw;
+    html += '<tr><td>'+m+'月</td><td>'+money(d.save)+'</td><td>'+money(d.draw)+'</td><td class="'+(bal<0?'negative':'positive')+'">'+money(bal)+'</td></tr>';
+  }
+  const ySave = s.monthly.reduce((a,b)=>a+b.save,0);
+  const yDraw = s.monthly.reduce((a,b)=>a+b.draw,0);
+  html += '<tr class="total-row"><td>'+year+'年合计</td><td>'+money(ySave)+'</td><td>'+money(yDraw)+'</td><td class="'+((ySave-yDraw)<0?'negative':'positive')+'">'+money(ySave-yDraw)+'</td></tr>';
+  tbody.innerHTML = html;
+  drawChart();
+}
+
+function drawChart(){
+  const s = calcStats();
+  if(typeof echarts === 'undefined'){
+    renderCssChart(s.monthly);
+    if(chart){ chart.dispose(); chart=null; }
+    return;
+  }
+  $('chartFallback').style.display='none';
+  const el = $('monthChart');
+  if(!chart) chart = echarts.init(el);
+  const months = s.monthly.map((m,i)=>(i+1)+'月');
+  chart.setOption({
+    grid:{left:8,right:8,top:34,bottom:6,containLabel:true},
+    tooltip:{trigger:'axis',axisPointer:{type:'shadow'},formatter:function(ps){
+      let h = '<b>'+ps[0].axisValue+'</b>';
+      ps.forEach(p=>{h+='<br />'+p.marker+p.seriesName+'：'+money(p.value)+' 元';});
+      return h;
+    }},
+    legend:{data:['存钱','取钱'],top:2,right:4,icon:'roundRect',itemWidth:10,itemHeight:6,itemGap:12,textStyle:{color:'#7A8A84',fontSize:11}},
+    xAxis:{type:'category',data:months,axisLine:{lineStyle:{color:'#D8DEDA'}},axisTick:{show:false},axisLabel:{color:'#7A8A84',fontSize:10}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:'#EEF2EE'}},axisLabel:{color:'#9AA8A2',fontSize:10}},
+    series:[
+      {name:'存钱',type:'bar',data:s.monthly.map(m=>m.save),itemStyle:{color:'#0F9D6C',borderRadius:[4,4,0,0]},barMaxWidth:10},
+      {name:'取钱',type:'bar',data:s.monthly.map(m=>m.draw),itemStyle:{color:'#E0562B',borderRadius:[4,4,0,0]},barMaxWidth:10}
+    ]
+  },true);
+  chart.resize();
+}
+
+function renderCssChart(monthly){
+  const el = $('chartFallback');
+  el.style.display='flex';
+  const max = Math.max.apply(null, monthly.map(m=>Math.max(m.save,m.draw)));
+  let html = '<div class="cssbars">';
+  monthly.forEach((m,i)=>{
+    const sh = m.save>0 ? Math.max(3,Math.round(m.save/max*84)):2;
+    const dh = m.draw>0 ? Math.max(3,Math.round(m.draw/max*84)):2;
+    html += '<div class="csscol"><div class="cssbars-in"><div class="bar save" style="height:'+sh+'px"></div><div class="bar draw" style="height:'+dh+'px"></div></div><div class="csslab">'+(i+1)+'月</div></div>';
+  });
+  html += '</div><div class="csslegend"><span class="lg lg-save"></span>存钱<span class="lg lg-draw"></span>取钱</div>';
+  html += '<div class="css-note">图表组件未加载，已切换为简易条形图</div>';
+  el.innerHTML = html;
+}
+
+function renderRecords(){
+  const sel = $('monthFilter');
+  const set = new Set();
+  records.forEach(r=>{if(r.date) set.add(r.date.slice(0,7));});
+  const opts = Array.from(set).sort().reverse();
+  sel.innerHTML = '<option value="all">全部月份</option>' + opts.map(m=>'<option value="'+m+'"'+(monthFilter===m?' selected':'')+'>'+m.replace('-','年')+'月</option>').join('');
+  document.querySelectorAll('#typeChips .chip').forEach(c=>c.classList.toggle('active',c.dataset.t===typeFilter));
+  let list = records.slice();
+  if(typeFilter!=='all') list = list.filter(r=>r.type===typeFilter);
+  if(monthFilter!=='all') list = list.filter(r=>(r.date||'').slice(0,7)===monthFilter);
+  list.sort((a,b)=>{
+    const da = a.date||'0000-00-00', db = b.date||'0000-00-00';
+    if(da===db) return 0;
+    return da < db ? 1 : -1;
+  });
+  const box = $('recordList');
+  $('recordsEmpty').hidden = list.length>0;
+  if(!list.length){ box.innerHTML=''; return; }
+  box.innerHTML = list.map((r,i)=>{
+    const idx = records.indexOf(r);
+    const isSave = r.type==='存钱';
+    const d = r.date||'未填日期';
+    const amtCls = isSave?'save':'draw';
+    const sign = isSave?'+':'-';
+    const delBtn = armedDel===idx
+      ?'<button class="rec-del armed" data-del="'+idx+'">确认删除</button>'
+      :'<button class="rec-del" data-del="'+idx+'">删除</button>';
+    return '<div class="rec">'+
+      '<div class="rec-badge '+(isSave?'save':'draw')+'">'+(isSave?'存':'取')+'</div>'+
+      '<div class="rec-main">'+
+        '<div class="rec-top"><span class="rec-date">'+d+'</span></div>'+
+        (r.remark?'<div class="rec-remark">'+esc(r.remark)+'</div>':'')+
+        '<div class="rec-ai">'+esc(r.ai||genAI(r.type,r.amount,idx))+'</div>'+
+      '</div>'+
+      '<div class="rec-right">'+
+        '<div class="rec-amt '+amtCls+'">'+sign+money(r.amount)+'</div>'+
+        delBtn+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function renderSync(){
+  const s = calcStats();
+  $('syncCount').textContent = records.length+' 条';
+  $('syncYear').textContent = year+' 年';
+  let last = '';
+  try{ last = localStorage.getItem(SYNC_KEY)||''; }catch(e){}
+  $('syncLast').textContent = last||'尚未导出';
+}
+
+function updateAddUI(){
+  const isSave = addType==='存钱';
+  document.querySelectorAll('#typeSeg .seg-btn').forEach(b=>{
+    b.classList.toggle('active',b.dataset.t===addType);
+  });
+  const btn = $('submitBtn');
+  btn.classList.toggle('draw-mode',!isSave);
+  btn.textContent = isSave?'记一笔存钱':'记一笔取钱';
+  updatePreview();
+}
+function updatePreview(){
+  const amt = parseFloat($('amountInput').value);
+  const s = calcStats();
+  if(isNaN(amt)||amt<=0){ $('addPreview').innerHTML = '记账后结余：'+money(s.balance)+' 元'; return; }
+  const bal = s.balance + (addType==='存钱'?amt:-amt);
+  $('addPreview').innerHTML = '记账后结余：<b>'+money(bal)+'</b> 元';
+}
+
+// 新增记录，保存到本地
+function submitRecord(){
+  const amt = parseFloat($('amountInput').value);
+  const date = $('dateInput').value;
+  const remark = $('remarkInput').value.trim();
+  if(isNaN(amt)||amt<=0){ toast('请输入大于 0 的金额'); $('amountInput').focus(); return; }
+  const rec = {date,type:addType,amount:Math.round(amt*100)/100,remark,ai:genAI(addType,amt,records.length)};
+  records.push(rec);
+  saveState(); //新增立刻保存本地
+  $('amountInput').value='';
+  $('remarkInput').value='';
+  updatePreview();
+  view='overview';
+  render();
+  toast('已记一笔'+(addType==='存钱'?'存钱':'取钱'));
+}
+
+// 删除记录，删除后立刻保存本地存储
+function delRecord(idx){
+  if(armedDel === idx){
+    records.splice(idx,1);
+    saveState(); //删除后落盘保存
+    armedDel = -1;
+    clearTimeout(armedTimer);
+    toast('已删除该笔记录');
+    render();
+    return;
+  }
+  armedDel = idx;
+  renderRecords();
+  clearTimeout(armedTimer);
+  armedTimer = setTimeout(()=>{armedDel=-1;renderRecords();},3000);
+}
+
+function normDate(v){
+  if(!v && v!==0) return '';
+  if(v instanceof Date && !isNaN(v)) return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0');
+  if(typeof v==='number' && v>20000){
+    const d = new Date(Math.round((v-25569)*86400000));
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  const s = String(v).trim();
+  const m = s.match(/(\d{4})[-\/.年](\d{1,2})[-\/.月](\d{1,2})/);
+  if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+  return s;
+}
+
+function handleFile(e){
+  const file = e.target.files[0];
+  e.target.value='';
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    if(typeof XLSX === 'undefined'){ toast('表格组件未加载，请联网后重试'); return; }
+    try{
+      const wb = XLSX.read(new Uint8Array(ev.target.result),{type:'array',cellDates:true});
+      const ws = wb.Sheets['记账明细']||wb.Sheets[wb.SheetNames[0]];
+      if(!ws){ toast('未找到「记账明细」工作表'); return; }
+      const rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+      const out = [];
+      for(const row of rows){
+        const type = String(row[1]||'').trim();
+        if(type!=='存钱' && type!=='取钱') continue;
+        const amt = parseFloat(row[2]);
+        if(isNaN(amt)) continue;
+        const date = normDate(row[0]);
+        out.push({date,type,amount:Math.round(amt*100)/100,remark:String(row[3]||'').trim(),ai:String(row[4]||'').trim()||genAI(type,amt,out.length)});
+      }
+      if(!out.length){ toast('明细为空或格式不符，无法导入'); return; }
+      records = out;
+      const ws2 = wb.Sheets['自动汇总'];
+      if(ws2 && ws2.C3){
+        const y = parseInt(XLSX.utils.format_cell(ws2.C3)||'',10);
+        if(y>=2000 && y<=2100) year = y;
+      }
+      saveState(); //导入后覆盖本地
+      render();
+      toast('已导入 '+out.length+' 条记录');
+    }catch(err){
+      toast('导入失败：'+err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function exportExcel(){
+  if(typeof XLSX === 'undefined'){ toast('表格组件未加载，请联网后重试'); return; }
+  const wb = XLSX.utils.book_new();
+  const rows = [[ '存钱取钱记账明细' ], [], [ '日期','类型','金额（元）','备注','AI一句话' ]];
+  for(const r of records){
+    let d = '';
+    if(r.date){
+      const p = r.date.split('-');
+      d = new Date(+p[0], (+p[1]||1)-1, +p[2]||1);
+    }
+    rows.push([d, r.type, r.amount, r.remark, r.ai||genAI(r.type,r.amount,rows.length)]);
+  }
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:4}}];
+  ws['!cols'] = [{wch:12},{wch:8},{wch:10},{wch:22},{wch:34}];
+  for(let i=3;i<rows.length;i++){
+    const c = ws[XLSX.utils.encode_cell({r:i,c:0})];
+    if(c && c.t==='d') c.z='yyyy/m/d';
+  }
+  XLSX.utils.book_append_sheet(wb,ws,'记账明细');
+
+  const st = calcStats();
+  const sum = [];
+  sum.push([null, '存钱取钱自动汇总']);
+  sum.push([null, '单位：元 ｜ 数据源：记账明细 ｜ 明细新增记录后，本表全部公式自动更新']);
+  sum.push([null, '统计年份（可修改）', year]);
+  sum.push([null, '一、收支概览']);
+  sum.push(['项目', '金额', '项目', '金额']);
+  sum.push(['累计存钱', "=SUMIF('记账明细'!B:B,\"存钱\",'记账明细'!C:C)", '累计取钱', "=SUMIF('记账明细'!B:B,\"取钱\",'记账明细'!C:C)"]);
+  sum.push(['当前结余', '=C6-E6', '本月存钱', "=SUMIFS('记账明细'!C:C,'记账明细'!B:B,\"存钱\",'记账明细'!A:A,\">=\"&DATE(YEAR(TODAY()),MONTH(TODAY()),1),'记账明细'!A:A,\"<\"&DATE(YEAR(TODAY()),MONTH(TODAY())+1,1))"]);
+  sum.push(['本月取钱', "=SUMIFS('记账明细'!C:C,'记账明细'!B:B,\"取钱\",'记账明细'!A:A,\">=\"&DATE(YEAR(TODAY()),MONTH(TODAY()),1),'记账明细'!A:A,\"<\"&DATE(YEAR(TODAY()),MONTH(TODAY())+1,1))", '本月结余', '=E7-C8']);
+  sum.push([]);
+  sum.push([null, '二、每月收支明细（自动汇总）']);
+  sum.push(['月份', '存钱', '取钱', '结余']);
+  for(let m=0;m<12;m++){
+    const r = 12+m;
+    sum.push([
+      '=TEXT(DATE($C$3,ROW()-11,1),"yyyy年m月")',
+      "=SUMIFS('记账明细'!$C:$C,'记账明细'!$B:$B,\"存钱\",'记账明细'!$A:$A,\">=\"&DATE($C$3,ROW()-11,1),'记账明细'!$A:$A,\"<\"&DATE($C$3,ROW()-11+1,1))",
+      "=SUMIFS('记账明细'!$C:$C,'记账明细'!$B:$B,\"取钱\",'记账明细'!$A:$A,\">=\"&DATE($C$3,ROW()-11,1),'记账明细'!$A:$A,\"<\"&DATE($C$3,ROW()-11+1,1))",
+      '=C'+r+'-D'+r
+    ]);
+  }
+  sum.push(['全年合计', '=SUM(C12:C23)', '=SUM(D12:D23)', '=SUM(E12:E23)']);
+  sum.push([]);
+  sum.push([null, '三、AI 收支一句话（AI 自动生成）']);
+  sum.push(['AI收支小结', aiSummary(st)]);
+  sum.push([null, '说明：以上短句由 AI 根据累计存钱、累计取钱、当前结余自动生成；明细新增记录后，本表汇总与短句都会自动更新。']);
+  const ws2 = XLSX.utils.aoa_to_sheet(sum);
+  ws2['!cols'] = [{wch:14},{wch:12},{wch:12},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws2,'自动汇总');
+  const fname = '存钱取钱自动记账表（网页同步版）.xlsx';
+  XLSX.writeFile(wb,fname);
+  try{ localStorage.setItem(SYNC_KEY,new Date().toLocaleString('zh-CN')); }catch(e){}
+  toast('已导出 '+fname);
+}
+
+function resetData(){
+  if(!confirm('确定恢复为初始 23 条示例数据？当前所有记录将被覆盖。')) return;
+  records = EMBEDDED.map(r=>Object.assign({},r));
+  year = 2026;
+  saveState();
+  render();
+  toast('已恢复初始数据');
+}
+
+document.getElementById('tabbar').addEventListener('click',e=>{
+  const t = e.target.closest('.tab');
+  if(!t) return;
+  view = t.dataset.view;
+  render();
+  window.scrollTo({top:0});
+});
+$('yearSelect').addEventListener('change',e=>{
+  year = parseInt(e.target.value,10);
+  saveState();
+  renderOverview();
+});
+$('typeChips').addEventListener('click',e=>{
+  const c = e.target.closest('.chip');
+  if(!c) return;
+  typeFilter = c.dataset.t;
+  renderRecords();
+});
+$('monthFilter').addEventListener('change',e=>{
+  monthFilter = e.target.value;
+  renderRecords();
+});
+$('recordList').addEventListener('click',e=>{
+  const b = e.target.closest('[data-del]');
+  if(b) delRecord(parseInt(b.dataset.del,10));
+});
+document.querySelectorAll('#typeSeg .seg-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    addType = b.dataset.t;
+    updateAddUI();
+  });
+});
+$('amountInput').addEventListener('input',updatePreview);
+$('remarkInput').addEventListener('input',updatePreview);
+$('submitBtn').addEventListener('click',submitRecord);
+$('importBtn').addEventListener('click',()=>$('fileInput').click());
+$('exportBtn').addEventListener('click',exportExcel);
+$('resetBtn').addEventListener('click',resetData);
+$('fileInput').addEventListener('change',handleFile);
+window.addEventListener('resize',()=>{if(chart) chart.resize();});
+
+// 程序启动，读取上次退出保存的数据
+loadState();
+if(!$('dateInput').value) $('dateInput').value = todayStr();
+updateAddUI();
+render();
+</script>
+</body>
+</html>
